@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>جزيرة الإحصاء</title>
+<meta name="description" content="لعبة ثلاثية الأبعاد بأسلوب روبلوكس لتعلّم المتوسط الحسابي والوسيط والمنوال">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Lalezar&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0f172a; --card:rgba(15,23,42,.82); --line:rgba(255,255,255,.14);
+    --mean:#3b82f6; --median:#22c55e; --mode:#f97316; --final:#a855f7; --gold:#facc15;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:#7cc6ff;color-scheme:light;font-family:'Cairo',sans-serif;color:#fff;-webkit-user-select:none;user-select:none}
+  canvas#game{display:block;width:100vw;height:100vh;touch-action:none;outline:none}
+  .hidden{display:none!important}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none}
+  .topbar{position:absolute;top:calc(12px + env(safe-area-inset-top, 0px));left:12px;right:12px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  .pill{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:6px 14px;font-weight:700;font-size:16px;backdrop-filter:blur(6px);white-space:nowrap}
+  .pill.btn{pointer-events:auto;cursor:pointer;color:#fff;font-family:inherit}
+  .pill.btn:hover{border-color:#fff}
+  #stagePill{border-color:var(--stage,#fff)}
+  #qcard{position:absolute;top:70px;right:12px;width:min(360px,calc(100vw - 24px));background:var(--card);border:3px solid var(--stage,#fff);border-radius:18px;padding:12px 14px;backdrop-filter:blur(6px)}
+  #qcard .ctx{font-size:14px;opacity:.85}
+  #qcard .q{font-size:19px;font-weight:900;margin-top:6px}
+  #qcard .hint{font-size:13px;opacity:.75;margin-top:6px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0}
+  .chip{min-width:40px;padding:4px 8px;border-radius:10px;background:#fff;color:var(--ink);font-weight:900;font-size:18px;text-align:center;box-shadow:0 3px 0 rgba(0,0,0,.25)}
+  .chip.hi{background:var(--gold)}
+  .chip small{font-size:12px;opacity:.7;margin-inline-start:2px}
+  #toast{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%) scale(.8);font-family:'Lalezar','Cairo',sans-serif;font-size:clamp(28px,6vw,56px);text-shadow:0 4px 0 rgba(0,0,0,.35);opacity:0;transition:opacity .25s,transform .25s;white-space:nowrap}
+  #toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+  /* ---------- Overlays ---------- */
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.45);padding:16px;z-index:10}
+  .box{background:#fff;color:var(--ink);border-radius:24px;max-width:560px;width:100%;max-height:calc(100vh - 32px);overflow:auto;padding:24px;box-shadow:0 10px 0 rgba(0,0,0,.25),0 30px 60px rgba(0,0,0,.3);border:4px solid var(--stage,#1e293b)}
+  .box h1{font-family:'Lalezar','Cairo',sans-serif;font-weight:400;font-size:clamp(34px,7vw,52px);line-height:1.15;text-align:center;color:#1e3a8a}
+  .box h2{font-family:'Lalezar','Cairo',sans-serif;font-weight:400;font-size:32px;text-align:center;color:var(--stage,#1e293b);margin-bottom:8px}
+  .box p{font-size:17px;line-height:1.8;margin:6px 0}
+  .box .sub{text-align:center;color:#475569}
+  .box .chips .chip{background:#e2e8f0}
+  .box .chips .chip.hi{background:var(--gold)}
+  .math{direction:ltr;text-align:center;font-weight:900;font-size:22px;background:#f1f5f9;border-radius:12px;padding:8px;margin:8px 0;color:#0f172a}
+  .rule{background:#f8fafc;border-inline-start:6px solid var(--stage,#3b82f6);border-radius:12px;padding:10px 14px;margin:10px 0;font-weight:700}
+  .legend{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+  .legend div{border-radius:14px;padding:10px 6px;text-align:center;color:#fff;font-weight:900;font-size:15px;box-shadow:0 4px 0 rgba(0,0,0,.2)}
+  .controls{background:#f1f5f9;border-radius:14px;padding:10px 14px;font-size:15px;line-height:1.9}
+  kbd{background:#fff;border:2px solid #cbd5e1;border-bottom-width:4px;border-radius:8px;padding:0 7px;font-family:inherit;font-weight:900;font-size:14px}
+  .go{display:block;width:100%;margin-top:16px;border:none;border-radius:16px;padding:14px;font-family:'Lalezar','Cairo',sans-serif;font-size:28px;color:#fff;background:#16a34a;box-shadow:0 6px 0 #14532d;cursor:pointer;transition:transform .08s}
+  .go:active{transform:translateY(4px);box-shadow:0 2px 0 #14532d}
+  .go.alt{background:#2563eb;box-shadow:0 6px 0 #1e3a8a}
+  .stars{text-align:center;font-size:48px;letter-spacing:6px;margin:6px 0}
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}
+  .stats div{background:#f1f5f9;border-radius:12px;padding:10px;text-align:center;font-weight:700}
+  .stats b{display:block;font-size:26px;color:#1e3a8a}
+  #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Lalezar','Cairo',sans-serif;font-size:32px;background:#7cc6ff;z-index:20}
+
+  /* ---------- Touch ---------- */
+  #touch{position:fixed;inset:0;pointer-events:none}
+  #joy{position:absolute;left:24px;bottom:calc(28px + env(safe-area-inset-bottom, 0px));width:130px;height:130px;border-radius:50%;background:rgba(15,23,42,.35);border:3px solid rgba(255,255,255,.5);pointer-events:auto;touch-action:none}
+  #knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.85)}
+  #jumpBtn{position:absolute;right:28px;bottom:calc(40px + env(safe-area-inset-bottom, 0px));width:96px;height:96px;border-radius:50%;border:none;background:#16a34a;color:#fff;font-family:'Lalezar','Cairo',sans-serif;font-size:24px;box-shadow:0 6px 0 #14532d;pointer-events:auto;touch-action:none}
+  #jumpBtn:active{transform:translateY(4px);box-shadow:0 2px 0 #14532d}
+  @media (max-width:640px){
+    .pill{font-size:13px;padding:4px 9px}
+    #qcard{top:auto;bottom:180px;right:12px}
+    #qcard .q{font-size:16px}
+    .chip{font-size:15px;min-width:32px}
+  }
+</style>
+</head>
+<body>
+<div id="loading">جارٍ تحميل الجزيرة…</div>
+<canvas id="game" tabindex="0"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="topbar">
+    <div class="pill" id="stagePill">جزيرة البداية</div>
+    <div class="pill">⭐ <span id="score">0</span></div>
+    <div class="pill">✅ <span id="prog">0</span>/<span id="total">12</span></div>
+    <div class="pill">⏱ <span id="time">0:00</span></div>
+    <div class="pill">💥 <span id="falls">0</span></div>
+    <button class="pill btn" id="lessonBtn">📘 الدرس</button>
+    <button class="pill btn" id="muteBtn">🔊</button>
+  </div>
+  <div id="qcard" class="hidden"></div>
+  <div id="toast"></div>
+</div>
+
+<div id="touch" class="hidden">
+  <div id="joy"><div id="knob"></div></div>
+  <button id="jumpBtn">قفز</button>
+</div>
+
+<!-- Start screen -->
+<div id="startScreen" class="overlay hidden">
+  <div class="box">
+    <h1>جزيرة الإحصاء 🏝️</h1>
+    <p class="sub">مغامرة «أوبي» ثلاثية الأبعاد: اقفز عبر الجسور الزجاجية… والبلاطة الخاطئة تنكسر تحتك!</p>
+    <div class="legend">
+      <div style="background:var(--mean)">المتوسط الحسابي</div>
+      <div style="background:var(--median)">الوسيط</div>
+      <div style="background:var(--mode)">المنوال</div>
+    </div>
+    <div class="controls">
+      🎮 <b>الحركة:</b> <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> أو الأسهم<br>
+      🦘 <b>القفز:</b> <kbd>مسافة</kbd><br>
+      🎥 <b>الكاميرا:</b> اسحب بالفأرة • العجلة للتقريب<br>
+      📘 <b>الدرس:</b> <kbd>H</kbd> في أي وقت<br>
+      📱 على الجوال: عصا التحكم يسارًا وزر القفز يمينًا
+    </div>
+    <button class="go" id="startBtn">ابدأ المغامرة ▶</button>
+  </div>
+</div>
+
+<!-- Generic panel -->
+<div id="panel" class="overlay hidden">
+  <div class="box" id="panelBox">
+    <div id="panelBody"></div>
+    <button class="go" id="panelBtn">فهمت!</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+
+/* =========================================================
+   1) الرياضيات: توليد الأسئلة
+   ========================================================= */
+const rnd = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sum = a => a.reduce((s, x) => s + x, 0);
+const avg = a => sum(a) / a.length;
+const fmt = x => Number.isInteger(x) ? String(x) : String(Math.round(x * 10) / 10);
+const sorted = a => a.slice().sort((x, y) => x - y);
+function medianOf(a) { const s = sorted(a), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; }
+function counts(a) { const m = new Map(); a.forEach(v => m.set(v, (m.get(v) || 0) + 1)); return m; }
+
+const CONTEXTS = [
+  'عدد التمرات التي أكلها كل صديق',
+  'درجات الطلاب في اختبار قصير',
+  'عدد الأهداف في مباريات الفريق',
+  'عدد الكتب التي قرأها كل طالب',
+  'عدد الجواهر التي جمعها كل لاعب',
+  'نقاط اللاعبين في الجولة الأولى',
+  'عدد الرسائل التي وصلت كل يوم',
+  'عدد الأشجار التي زرعها كل فصل',
+  'عدد الدقائق التي قضاها كل لاعب في التدريب',
+  'عدد العملات الذهبية في كل صندوق'
+];
+let ctxPool = shuffle(CONTEXTS);
+const nextCtx = () => { if (!ctxPool.length) ctxPool = shuffle(CONTEXTS); return ctxPool.pop(); };
+
+const TYPE_INFO = {
+  mean:   { name: 'المتوسط الحسابي', q: 'ما المتوسط الحسابي لهذه القيم؟', color: 0x3b82f6, css: '#3b82f6' },
+  median: { name: 'الوسيط',          q: 'ما الوسيط لهذه القيم؟',          color: 0x22c55e, css: '#22c55e' },
+  mode:   { name: 'المنوال',         q: 'ما المنوال لهذه القيم؟',         color: 0xf97316, css: '#f97316' }
+};
+
+function buildOptions(ans, mistakes, fallback) {
+  const seen = new Set([fmt(ans)]), out = [];
+  const tryAdd = c => {
+    if (out.length >= 2 || c == null || !isFinite(c) || c <= 0) return;
+    const k = fmt(c); if (seen.has(k)) return; seen.add(k); out.push(c);
+  };
+  shuffle(mistakes).forEach(tryAdd);
+  fallback.forEach(tryAdd);
+  for (let d = 1; out.length < 2; d++) { tryAdd(ans + d); tryAdd(ans - d); }
+  return shuffle([ans, ...out]);
+}
+
+function genMean(n) {
+  for (;;) {
+    const m = rnd(4, 12);
+    const vals = Array.from({ length: n - 1 }, () => rnd(1, 15));
+    const last = m * n - sum(vals);
+    if (last < 1 || last > 18) continue;
+    const data = shuffle([...vals, last]);
+    const c = counts(data); let mode = null, best = 1;
+    c.forEach((k, v) => { if (k > best) { best = k; mode = v; } });
+    return {
+      type: 'mean', data, answer: m,
+      options: buildOptions(m, [medianOf(data), mode, Math.round(sum(data) / (n - 1))], [m + 1, m - 1, m + 2])
+    };
+  }
+}
+function genMedian(n) {
+  for (;;) {
+    const data = Array.from({ length: n }, () => rnd(1, 20));
+    const s = sorted(data), med = medianOf(data);
+    const raw = n % 2 ? data[(n - 1) / 2] : (data[n / 2 - 1] + data[n / 2]) / 2; // خطأ شائع: نسيان الترتيب
+    if (fmt(raw) === fmt(med)) continue;
+    if (new Set(data).size < n - 1) continue;
+    const mid = Math.floor(n / 2);
+    return {
+      type: 'median', data, answer: med,
+      options: buildOptions(med, [raw, Math.round(avg(data) * 10) / 10], [s[mid - 1], s[mid + 1], med + 1, med - 1])
+    };
+  }
+}
+function genMode(n) {
+  const v = rnd(2, 15); let w; do { w = rnd(1, 18); } while (w === v);
+  const used = new Set([v, w]), singles = [];
+  while (singles.length < n - 5) { const x = rnd(1, 20); if (!used.has(x)) { used.add(x); singles.push(x); } }
+  const data = shuffle([v, v, v, w, w, ...singles]);
+  return {
+    type: 'mode', data, answer: v,
+    options: buildOptions(v, [3, w, medianOf(data)], [Math.max(...data), v + 1, v - 1])
+  };
+}
+
+function makeQuestions() {
+  const stages = [
+    { key: 'mean',   name: 'المتوسط الحسابي', color: 0x3b82f6, css: '#3b82f6', qs: [genMean(4), genMean(5), genMean(6)] },
+    { key: 'median', name: 'الوسيط',          color: 0x22c55e, css: '#22c55e', qs: [genMedian(5), genMedian(7), genMedian(6)] },
+    { key: 'mode',   name: 'المنوال',         color: 0xf97316, css: '#f97316', qs: [genMode(6), genMode(7), genMode(8)] },
+    { key: 'final',  name: 'التحدي النهائي',  color: 0xa855f7, css: '#a855f7', qs: shuffle([genMean(6), genMedian(rnd(0,1) ? 7 : 8), genMode(7)]) }
+  ];
+  stages.forEach((st, si) => st.qs.forEach((q, qi) => {
+    q.ctx = nextCtx(); q.stage = si; q.index = qi; q.solved = false; q.wrong = 0;
+  }));
+  return stages;
+}
+
+/* =========================================================
+   2) الدروس والشروحات (HTML)
+   ========================================================= */
+const chipsHTML = (arr, hi = []) => '<div class="chips" dir="ltr">' + arr.map((v, i) => `<span class="chip ${hi.includes(i) ? 'hi' : ''}">${fmt(v)}</span>`).join('') + '</div>';
+
+const LESSONS = {
+  mean: `
+    <h2>📘 المتوسط الحسابي</h2>
+    <div class="rule">اجمع كل القيم، ثم اقسم المجموع على عدد القيم.</div>
+    <p>مثال: القيم</p>${chipsHTML([2, 4, 9])}
+    <div class="math">2 + 4 + 9 = 15</div>
+    <div class="math">15 ÷ 3 = 5</div>
+    <p>إذن المتوسط الحسابي = <b>5</b> ✨</p>`,
+  median: `
+    <h2>📗 الوسيط</h2>
+    <div class="rule">رتّب القيم من الأصغر إلى الأكبر، ثم خذ القيمة التي في المنتصف.</div>
+    <p>مثال (عدد فردي):</p>${chipsHTML([7, 1, 4])}
+    <p>بعد الترتيب:</p>${chipsHTML([1, 4, 7], [1])}
+    <p>إذا كان عدد القيم <b>زوجيًا</b> نأخذ متوسط القيمتين في المنتصف:</p>
+    ${chipsHTML([2, 5, 7, 10], [1, 2])}
+    <div class="math">(5 + 7) ÷ 2 = 6</div>
+    <p>⚠️ انتبه: لا تأخذ المنتصف قبل الترتيب!</p>`,
+  mode: `
+    <h2>📙 المنوال</h2>
+    <div class="rule">المنوال هو القيمة الأكثر تكرارًا بين القيم.</div>
+    <p>مثال:</p>${chipsHTML([3, 5, 3, 8, 3, 5], [0, 2, 4])}
+    <p>العدد 3 تكرر 3 مرات، فهو <b>المنوال</b>.</p>
+    <p>⚠️ انتبه: المنوال هو <b>القيمة</b> نفسها، وليس عدد مرات تكرارها!</p>`,
+  final: `
+    <h2>🏆 التحدي النهائي</h2>
+    <div class="rule">الآن الأسئلة مختلطة: متوسط حسابي أو وسيط أو منوال.</div>
+    <p>➕ <b>المتوسط:</b> المجموع ÷ العدد</p>
+    <p>↔️ <b>الوسيط:</b> رتّب ثم خذ المنتصف</p>
+    <p>🔁 <b>المنوال:</b> الأكثر تكرارًا</p>
+    <p>اقرأ السؤال جيدًا قبل أن تقفز!</p>`
+};
+
+function explainHTML(q) {
+  const d = q.data, n = d.length;
+  if (q.type === 'mean') {
+    const S = sum(d);
+    return `<p>نجمع كل القيم:</p><div class="math">${d.join(' + ')} = ${S}</div>
+            <p>عدد القيم = ${n}، فنقسم المجموع على العدد:</p>
+            <div class="math">${S} ÷ ${n} = ${fmt(q.answer)}</div>`;
+  }
+  if (q.type === 'median') {
+    const s = sorted(d);
+    if (n % 2) {
+      const m = (n - 1) / 2;
+      return `<p>أولًا نرتّب القيم تصاعديًا:</p>${chipsHTML(s, [m])}
+              <p>عددها ${n} (فردي)، فالوسيط هو القيمة في المنتصف: <b>${fmt(q.answer)}</b></p>`;
+    }
+    const a = s[n / 2 - 1], b = s[n / 2];
+    return `<p>أولًا نرتّب القيم تصاعديًا:</p>${chipsHTML(s, [n / 2 - 1, n / 2])}
+            <p>عددها ${n} (زوجي)، فنأخذ متوسط القيمتين في المنتصف:</p>
+            <div class="math">(${a} + ${b}) ÷ 2 = ${fmt(q.answer)}</div>`;
+  }
+  const c = counts(d);
+  const keys = [...c.keys()].sort((x, y) => x - y);
+  return `<p>نعدّ كم مرة تكررت كل قيمة:</p>
+          <div class="chips" dir="ltr">${keys.map(k => `<span class="chip ${k === q.answer ? 'hi' : ''}">${k}<small>×${c.get(k)}</small></span>`).join('')}</div>
+          <p>القيمة الأكثر تكرارًا هي <b>${q.answer}</b> (تكررت ${c.get(q.answer)} مرات)، إذن المنوال = <b>${q.answer}</b></p>`;
+}
+
+/* =========================================================
+   3) عناصر الواجهة
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const ui = {
+  score: $('score'), prog: $('prog'), total: $('total'), time: $('time'), falls: $('falls'),
+  stagePill: $('stagePill'), qcard: $('qcard'), toast: $('toast'),
+  panel: $('panel'), panelBox: $('panelBox'), panelBody: $('panelBody'), panelBtn: $('panelBtn')
+};
+let toastTimer = 0;
+function toast(text, color = '#fff') {
+  ui.toast.textContent = text; ui.toast.style.color = color;
+  ui.toast.classList.add('show'); clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => ui.toast.classList.remove('show'), 1600);
+}
+let panelCb = null;
+function showPanel(html, btn = 'فهمت!', color = '#1e293b', cb = null) {
+  ui.panelBody.innerHTML = html; ui.panelBtn.textContent = btn;
+  ui.panelBox.style.setProperty('--stage', color);
+  ui.panel.classList.remove('hidden'); paused = true; keys.clear(); panelCb = cb;
+  setTimeout(() => ui.panelBtn.focus(), 50);
+}
+ui.panelBtn.onclick = () => {
+  ui.panel.classList.add('hidden'); paused = false; canvas.focus();
+  const cb = panelCb; panelCb = null; if (cb) cb();
+};
+
+/* =========================================================
+   4) الأصوات
+   ========================================================= */
+let actx = null, muted = false;
+function tone(f1, f2, dur, type = 'triangle', vol = 0.08, delay = 0) {
+  if (!actx || muted) return;
+  const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+const sfx = {
+  jump:  () => tone(380, 640, 0.13, 'square', 0.04),
+  coin:  () => { tone(988, 988, 0.07, 'square', 0.04); tone(1319, 1319, 0.16, 'square', 0.04, 0.07); },
+  good:  () => [523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.18, 'triangle', 0.09, i * 0.08)),
+  crack: () => tone(1800, 900, 0.08, 'sawtooth', 0.03),
+  brk:   () => { tone(300, 40, 0.5, 'sawtooth', 0.08); tone(2200, 300, 0.25, 'square', 0.03); },
+  check: () => tone(660, 990, 0.2, 'triangle', 0.07),
+  win:   () => [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => tone(f, f, 0.22, 'triangle', 0.09, i * 0.12))
+};
+$('muteBtn').onclick = () => { muted = !muted; $('muteBtn').textContent = muted ? '🔇' : '🔊'; canvas.focus(); };
+
+/* =========================================================
+   5) المشهد ثلاثي الأبعاد
+   ========================================================= */
+const canvas = $('game');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xa9dcff, 70, 260);
+{
+  const c = document.createElement('canvas'); c.width = 2; c.height = 256;
+  const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, '#3a8ee6'); gr.addColorStop(0.6, '#8fd0ff'); gr.addColorStop(1, '#d8f0ff');
+  g.fillStyle = gr; g.fillRect(0, 0, 2, 256);
+  scene.background = new THREE.CanvasTexture(c);
+}
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 600);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x7a9cc0, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 120 });
+sun.shadow.bias = -0.0005;
+scene.add(sun, sun.target);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ---------- نسيج المسامير (Studs) ---------- */
+const studCanvas = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 64);
+  g.strokeStyle = 'rgba(0,0,0,.07)'; g.lineWidth = 2; g.strokeRect(1, 1, 62, 62);
+  g.fillStyle = 'rgba(0,0,0,.12)'; g.beginPath(); g.arc(34, 35, 15, 0, Math.PI * 2); g.fill();
+  const gr = g.createRadialGradient(27, 26, 2, 32, 32, 15); gr.addColorStop(0, '#fff'); gr.addColorStop(1, '#e3e3e3');
+  g.fillStyle = gr; g.beginPath(); g.arc(32, 32, 14, 0, Math.PI * 2); g.fill();
+  return c;
+})();
+function studTex(w, d) {
+  const t = new THREE.CanvasTexture(studCanvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(Math.max(1, Math.round(w)), Math.max(1, Math.round(d)));
+  t.anisotropy = 4; return t;
+}
+const shade = (hex, f) => new THREE.Color(hex).multiplyScalar(f);
+
+/* ---------- أدوات الرسم على Canvas ---------- */
+const FONT = "'Cairo', sans-serif";
+function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function wrapText(g, text, x, y, maxW, lh) {
+  const words = text.split(' '); let line = '', lines = [];
+  for (const w of words) { const t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
+  lines.push(line); lines.forEach((l, i) => g.fillText(l, x, y + i * lh)); return lines.length;
+}
+function drawChips(g, values, cx, y, color, hi = []) {
+  const cw = Math.min(110, 900 / values.length - 14), gap = 14, total = values.length * cw + (values.length - 1) * gap;
+  let x = cx - total / 2;
+  g.direction = 'ltr'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  values.forEach((v, i) => {
+    g.fillStyle = 'rgba(0,0,0,.25)'; rr(g, x, y + 6, cw, 90, 18); g.fill();
+    g.fillStyle = hi.includes(i) ? '#facc15' : '#fff'; rr(g, x, y, cw, 90, 18); g.fill();
+    g.fillStyle = '#0f172a'; g.font = `900 52px ${FONT}`; g.fillText(fmt(v), x + cw / 2, y + 48);
+    x += cw + gap;
+  });
+  g.direction = 'rtl';
+}
+function boardFrom(canvasEl, w, h, frameColor) {
+  const grp = new THREE.Group();
+  const tex = new THREE.CanvasTexture(canvasEl); tex.anisotropy = 8;
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  plane.position.z = 0.16;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, h + 0.5, 0.3), new THREE.MeshLambertMaterial({ color: frameColor, transparent: true }));
+  back.castShadow = true;
+  grp.add(back, plane); boards.push({ grp, mats: [plane.material, back.material], fade: 1 }); return grp;
+}
+function newCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.direction = 'rtl'; return [c, g]; }
+
+function lessonBoardCanvas(stage) {
+  const [c, g] = newCanvas(1024, 640);
+  g.fillStyle = '#0f172a'; rr(g, 0, 0, 1024, 640, 40); g.fill();
+  g.fillStyle = stage.css; rr(g, 0, 0, 1024, 130, 40); g.fill(); g.fillRect(0, 90, 1024, 40);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `900 70px ${FONT}`; g.fillText(stage.key === 'final' ? '🏆 التحدي النهائي' : 'مرحلة: ' + stage.name, 512, 68);
+  const RULES = {
+    mean: ['اجمع كل القيم', 'ثم اقسم المجموع على عددها'],
+    median: ['رتّب القيم من الأصغر للأكبر', 'ثم خذ القيمة التي في المنتصف'],
+    mode: ['المنوال هو القيمة', 'الأكثر تكرارًا'],
+    final: ['أسئلة مختلطة!', 'متوسط • وسيط • منوال']
+  };
+  g.font = `700 54px ${FONT}`;
+  RULES[stage.key].forEach((l, i) => g.fillText(l, 512, 210 + i * 76));
+  const EX = { mean: ['2 + 4 + 9 = 15', '15 ÷ 3 = 5'], median: ['7, 1, 4  →  1, 4, 7', 'الوسيط = 4'], mode: ['3, 5, 3, 8, 3', 'المنوال = 3'], final: ['اقرأ السؤال جيدًا', 'ثم اقفز! 🦘'] };
+  g.fillStyle = 'rgba(255,255,255,.1)'; rr(g, 120, 380, 784, 200, 30); g.fill();
+  g.fillStyle = '#facc15'; g.font = `900 52px ${FONT}`;
+  EX[stage.key].forEach((l, i) => { g.direction = /[a-z؀-ۿ]/i.test(l) ? 'rtl' : 'ltr'; g.fillText(l, 512, 440 + i * 80); });
+  g.direction = 'rtl';
+  return c;
+}
+function questionBoardCanvas(q, stage) {
+  const [c, g] = newCanvas(1024, 600);
+  const info = TYPE_INFO[q.type];
+  g.fillStyle = 'rgba(15,23,42,.92)'; rr(g, 0, 0, 1024, 600, 40); g.fill();
+  g.fillStyle = stage.css; rr(g, 0, 0, 1024, 100, 40); g.fill(); g.fillRect(0, 60, 1024, 40);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `900 48px ${FONT}`; g.fillText(`${stage.name} • السؤال ${q.index + 1} من 3`, 512, 52);
+  g.font = `700 40px ${FONT}`; g.fillStyle = '#cbd5e1'; wrapText(g, q.ctx + ':', 512, 150, 920, 46);
+  drawChips(g, q.data, 512, 200, stage.css);
+  g.fillStyle = '#fff'; g.font = `900 60px ${FONT}`; g.fillText(info.q, 512, 385);
+  g.fillStyle = '#facc15'; g.font = `700 36px ${FONT}`; g.fillText('اقفز على البلاطة الصحيحة… الخاطئة تنكسر! 💥', 512, 470);
+  g.fillStyle = '#94a3b8'; g.font = `700 30px ${FONT}`; g.fillText('اضغط H لمراجعة الدرس', 512, 540);
+  return c;
+}
+function welcomeCanvas() {
+  const [c, g] = newCanvas(1024, 640);
+  g.fillStyle = '#0f172a'; rr(g, 0, 0, 1024, 640, 40); g.fill();
+  g.fillStyle = '#facc15'; rr(g, 0, 0, 1024, 140, 40); g.fill(); g.fillRect(0, 100, 1024, 40);
+  g.fillStyle = '#0f172a'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `900 72px ${FONT}`; g.fillText('أهلًا في جزيرة الإحصاء!', 512, 72);
+  g.fillStyle = '#fff'; g.font = `700 46px ${FONT}`;
+  ['اعبر 4 مراحل و 12 جسرًا زجاجيًا', 'في كل جسر 3 بلاطات… واحدة فقط صحيحة', 'احسب الإجابة ثم اقفز عليها!', 'اجمع العملات الذهبية ⭐'].forEach((l, i) => g.fillText(l, 512, 225 + i * 90));
+  return c;
+}
+function labelCanvas(text, bg = '#fff', fg = '#0f172a', size = 256) {
+  const [c, g] = newCanvas(size, size);
+  g.fillStyle = 'rgba(0,0,0,.25)'; rr(g, 16, 30, size - 32, size - 50, 50); g.fill();
+  g.fillStyle = bg; rr(g, 16, 16, size - 32, size - 50, 50); g.fill();
+  g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle'; g.direction = 'ltr';
+  g.font = `900 ${text.length > 3 ? 92 : 120}px ${FONT}`; g.fillText(text, size / 2, size / 2 - 8);
+  return c;
+}
+function sprite(canvasEl, s) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvasEl), depthTest: true }));
+  sp.scale.set(s, s, 1); return sp;
+}
+
+/* =========================================================
+   6) بناء العالم
+   ========================================================= */
+let boards = [], colliders = [], coins = [], debris = [], particles = [], clouds = [], flags = [], spinners = [];
+let STAGES, TOTAL_Q;
+
+function addBox(x, top, z, w, h, d, color, props = {}) {
+  const topMat = new THREE.MeshLambertMaterial({ color, map: studTex(w, d) });
+  const sideMat = new THREE.MeshLambertMaterial({ color: shade(color, 0.82) });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [sideMat, sideMat, topMat, sideMat, sideMat, sideMat]);
+  mesh.position.set(x, top - h / 2, z); mesh.castShadow = mesh.receiveShadow = true; scene.add(mesh);
+  const c = Object.assign({ minX: x - w / 2, maxX: x + w / 2, minY: top - h, maxY: top, minZ: z - d / 2, maxZ: z + d / 2, mesh, cx: x, cz: z }, props);
+  colliders.push(c); return c;
+}
+function addCoin(x, y, z) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.16, 24), new THREE.MeshLambertMaterial({ color: 0xfacc15, emissive: 0x6b4f00 }));
+  m.rotation.x = Math.PI / 2; m.position.set(x, y, z); m.castShadow = true; scene.add(m);
+  coins.push({ mesh: m, taken: false, baseY: y, ph: Math.random() * 6 });
+}
+function addFlag(x, z, color) {
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4, 8), new THREE.MeshLambertMaterial({ color: 0xe5e7eb }));
+  pole.position.y = 2; pole.castShadow = true;
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 0.06), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
+  flag.position.set(0.75, 3.5, 0);
+  g.add(pole, flag); g.position.set(x, 0, z); scene.add(g);
+  const f = { flag, color, on: false }; flags.push(f); return f;
+}
+function addArch(z, color, text) {
+  [-8.5, 8.5].forEach(x => addBox(x, 6, z, 1.4, 6, 1.4, color));
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(18.4, 1.6, 1.4), new THREE.MeshLambertMaterial({ color: shade(color, 0.9) }));
+  beam.position.set(0, 6.8, z); beam.castShadow = true; scene.add(beam);
+  const [c, g] = newCanvas(1024, 128);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `900 84px ${FONT}`; g.fillText(text, 512, 68);
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(16, 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+  p.position.set(0, 6.8, z + 0.72); scene.add(p);
+}
+function addCloud(x, y, z, s) {
+  const g = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.92 });
+  for (let i = 0; i < 5; i++) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(rnd(4, 8) * s, rnd(2, 3) * s, rnd(3, 6) * s), mat);
+    b.position.set((i - 2) * 2.6 * s, Math.random() * s, (Math.random() - 0.5) * 3 * s); g.add(b);
+  }
+  g.position.set(x, y, z); scene.add(g); clouds.push({ g, sp: 0.3 + Math.random() * 0.6 });
+}
+
+function buildWorld() {
+  STAGES = makeQuestions();
+  TOTAL_Q = STAGES.reduce((s, st) => s + st.qs.length, 0);
+  ui.total.textContent = TOTAL_Q;
+  const G = 2.4; // الفجوة بين المنصات
+  // منصة البداية
+  addBox(0, 0, 0, 20, 2, 18, 0x84cc16, { kind: 'start' });
+  const wb = boardFrom(welcomeCanvas(), 9, 5.6, 0x334155);
+  wb.position.set(-11, 4.5, -3); wb.rotation.y = 0.55; scene.add(wb);
+  addCoin(4, 1.4, -3); addCoin(5.5, 1.4, -5);
+  let cursor = -9;
+
+  STAGES.forEach((st, si) => {
+    // كتل القفز (Obby)
+    const heights = [0.9, 1.8, 0.9];
+    heights.forEach((h, k) => {
+      const zc = cursor - G - 1.6, x = (k % 2 ? 2.6 : -2.6) * (si % 2 ? -1 : 1);
+      addBox(x, h, zc, 3.2, 1.2, 3.2, shade(st.color, 1.15).getHex(), { kind: 'step' });
+      addCoin(x, h + 1.4, zc);
+      cursor = zc - 1.6;
+    });
+    // منصة المرحلة (الدرس)
+    const ic = cursor - G - 8;
+    const intro = addBox(0, 0, ic, 20, 2, 16, shade(st.color, 1.25).getHex(), { kind: 'intro', stage: si, shown: false });
+    addArch(ic + 7.2, st.color, st.key === 'final' ? 'التحدي النهائي' : st.name);
+    const lb = boardFrom(lessonBoardCanvas(st), 9, 5.6, shade(st.color, 0.6).getHex());
+    lb.position.set(-11, 4.5, ic - 2); lb.rotation.y = 0.55; scene.add(lb);
+    intro.spawn = new THREE.Vector3(0, 0, ic + 4);
+    cursor = ic - 8;
+
+    // الأسئلة
+    st.qs.forEach((q, qi) => {
+      const pc = cursor - G - 6;
+      const qp = addBox(0, 0, pc, 18, 2, 12, 0xe2e8f0, { kind: 'qplat', q });
+      qp.spawn = new THREE.Vector3(0, 0, pc + 2);
+      qp.flag = addFlag(7.5, pc + 4, st.color);
+      cursor = pc - 6;
+      // الجسر الزجاجي
+      const tz = cursor - G - 1.9, xs = [-4.8, 0, 4.8];
+      q.tiles = [];
+      q.options.forEach((opt, oi) => {
+        const correct = fmt(opt) === fmt(q.answer);
+        const [tc, tg] = newCanvas(256, 256);
+        const gr = tg.createLinearGradient(0, 0, 256, 256); gr.addColorStop(0, '#e0f7ff'); gr.addColorStop(1, '#9bdcf5');
+        tg.fillStyle = gr; tg.fillRect(0, 0, 256, 256); tg.strokeStyle = 'rgba(255,255,255,.9)'; tg.lineWidth = 10; tg.strokeRect(8, 8, 240, 240);
+        tg.fillStyle = '#0c4a6e'; tg.textAlign = 'center'; tg.textBaseline = 'middle'; tg.direction = 'ltr';
+        tg.font = `900 ${fmt(opt).length > 3 ? 96 : 120}px ${FONT}`; tg.fillText(fmt(opt), 128, 132);
+        const topMat = new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(tc), transparent: true, opacity: 0.95 });
+        const sideMat = new THREE.MeshLambertMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.7 });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.5, 3.8), [sideMat, sideMat, topMat, sideMat, sideMat, sideMat]);
+        mesh.position.set(xs[oi], -0.25, tz); mesh.receiveShadow = true; mesh.castShadow = true;
+        mesh.rotation.y = 0; scene.add(mesh);
+        const lab = sprite(labelCanvas(fmt(opt)), 2.2); lab.position.set(xs[oi], 2.6, tz); scene.add(lab);
+        const c = { minX: xs[oi] - 1.9, maxX: xs[oi] + 1.9, minY: -0.5, maxY: 0, minZ: tz - 1.9, maxZ: tz + 1.9, mesh, cx: xs[oi], cz: tz,
+                    kind: 'tile', q, correct, value: opt, label: lab, topMat, sideMat, crack: -1, broken: false };
+        colliders.push(c); q.tiles.push(c);
+      });
+      // لوحة السؤال العائمة
+      const qb = boardFrom(questionBoardCanvas(q, st), 10.5, 6.15, shade(st.color, 0.6).getHex());
+      qb.position.set(0, 9, tz - 3.4); scene.add(qb);
+      cursor = tz - 1.9;
+    });
+  });
+
+  // منصة النهاية
+  const fc = cursor - G - 11;
+  addBox(0, 0, fc, 24, 2, 22, 0xfde047, { kind: 'finish' });
+  addArch(fc + 10, 0xeab308, '🏁 خط النهاية');
+  // الكأس
+  const trophy = new THREE.Group(), gold = new THREE.MeshLambertMaterial({ color: 0xfacc15, emissive: 0x5a4300 });
+  const pts = [[0, 0], [1.4, 0], [1.4, 0.4], [0.5, 0.6], [0.35, 1.6], [1.6, 2.6], [1.8, 4], [1.6, 4]].map(p => new THREE.Vector2(p[0], p[1]));
+  const cup = new THREE.Mesh(new THREE.LatheGeometry(pts, 32), gold); cup.castShadow = true;
+  const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.8), gold); star.position.y = 5.2;
+  trophy.add(cup, star); trophy.position.set(0, 0, fc - 4); scene.add(trophy); spinners.push(trophy);
+  for (let i = 0; i < 8; i++) addCoin(Math.cos(i / 8 * Math.PI * 2) * 6, 1.4, fc - 4 + Math.sin(i / 8 * Math.PI * 2) * 6);
+
+  // الزينة: سحب وجزر بعيدة
+  for (let i = 0; i < 26; i++) addCloud(rnd(-90, 90), rnd(-28, -10), rnd(fc - 60, 60), 0.8 + Math.random());
+  for (let i = 0; i < 14; i++) addCloud((Math.random() < 0.5 ? -1 : 1) * rnd(30, 90), rnd(14, 30), rnd(fc - 40, 40), 0.7 + Math.random() * 0.6);
+  for (let i = 0; i < 10; i++) {
+    const side = Math.random() < 0.5 ? -1 : 1, x = side * rnd(35, 80), z = rnd(fc, 0), y = rnd(-20, -6);
+    const isl = new THREE.Mesh(new THREE.ConeGeometry(rnd(5, 9), rnd(8, 14), 6), new THREE.MeshLambertMaterial({ color: 0x8b5a2b }));
+    isl.rotation.x = Math.PI; isl.position.set(x, y - 5, z); scene.add(isl);
+    const grass = new THREE.Mesh(new THREE.CylinderGeometry(isl.geometry.parameters.radius, isl.geometry.parameters.radius, 1.2, 6), new THREE.MeshLambertMaterial({ color: 0x4ade80 }));
+    grass.position.set(x, y + 1.6, z); scene.add(grass);
+  }
+}
+
+/* =========================================================
+   7) الشخصية (أسلوب روبلوكس)
+   ========================================================= */
+const avatar = new THREE.Group();
+const skin = new THREE.MeshLambertMaterial({ color: 0xf5cd30 });
+const shirt = new THREE.MeshLambertMaterial({ color: 0x2563eb });
+const pants = new THREE.MeshLambertMaterial({ color: 0x15803d });
+const faceTex = (() => {
+  const [c, g] = newCanvas(128, 128);
+  g.fillStyle = '#f5cd30'; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = '#111'; g.beginPath(); g.ellipse(44, 52, 7, 11, 0, 0, Math.PI * 2); g.ellipse(84, 52, 7, 11, 0, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#111'; g.lineWidth = 7; g.lineCap = 'round'; g.beginPath(); g.arc(64, 70, 26, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
+  return new THREE.CanvasTexture(c);
+})();
+const faceMat = new THREE.MeshLambertMaterial({ map: faceTex });
+const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), [skin, skin, skin, skin, faceMat, skin]);
+head.position.y = 2.42;
+const torso = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 0.55), shirt); torso.position.y = 1.5;
+function limb(mat, w, x, y) {
+  const pivot = new THREE.Group(); pivot.position.set(x, y, 0);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, 0.5), mat); m.position.y = -0.5; m.castShadow = true;
+  pivot.add(m); avatar.add(pivot); return pivot;
+}
+const armL = limb(skin, 0.45, -0.74, 2.0), armR = limb(skin, 0.45, 0.74, 2.0);
+const legL = limb(pants, 0.48, -0.26, 1.0), legR = limb(pants, 0.48, 0.26, 1.0);
+[head, torso].forEach(m => { m.castShadow = true; avatar.add(m); });
+scene.add(avatar);
+
+/* =========================================================
+   8) الإدخال
+   ========================================================= */
+const keys = new Set();
+let jumpQueued = false;
+addEventListener('keydown', e => {
+  if (state !== 'play') return;
+  if (!ui.panel.classList.contains('hidden')) { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); ui.panelBtn.click(); } return; }
+  keys.add(e.code);
+  if (e.code === 'Space') { jumpQueued = true; e.preventDefault(); }
+  if (e.code === 'KeyH') showLesson();
+  if (e.code.startsWith('Arrow')) e.preventDefault();
+});
+addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('blur', () => keys.clear());
+
+let camYaw = 0, camPitch = 0.42, camDist = 11, drag = null;
+canvas.addEventListener('pointerdown', e => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); canvas.focus(); });
+canvas.addEventListener('pointermove', e => {
+  if (!drag || drag.id !== e.pointerId) return;
+  camYaw -= (e.clientX - drag.x) * 0.006; camPitch = Math.min(1.25, Math.max(0.08, camPitch + (e.clientY - drag.y) * 0.004));
+  drag.x = e.clientX; drag.y = e.clientY;
+});
+const endDrag = e => { if (drag && drag.id === e.pointerId) drag = null; };
+canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('wheel', e => { camDist = Math.min(20, Math.max(5, camDist + e.deltaY * 0.01)); e.preventDefault(); }, { passive: false });
+
+// تحكم اللمس
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+const joy = { x: 0, y: 0, id: null };
+const joyEl = $('joy'), knob = $('knob');
+joyEl.addEventListener('pointerdown', e => { joy.id = e.pointerId; joyEl.setPointerCapture(e.pointerId); moveJoy(e); });
+joyEl.addEventListener('pointermove', e => { if (joy.id === e.pointerId) moveJoy(e); });
+const endJoy = e => { if (joy.id === e.pointerId) { joy.id = null; joy.x = joy.y = 0; knob.style.transform = ''; } };
+joyEl.addEventListener('pointerup', endJoy); joyEl.addEventListener('pointercancel', endJoy);
+function moveJoy(e) {
+  const r = joyEl.getBoundingClientRect(), R = r.width / 2;
+  let dx = e.clientX - (r.left + R), dy = e.clientY - (r.top + R); const L = Math.hypot(dx, dy);
+  if (L > R) { dx *= R / L; dy *= R / L; }
+  joy.x = dx / R; joy.y = dy / R; knob.style.transform = `translate(${dx}px,${dy}px)`;
+}
+$('jumpBtn').addEventListener('pointerdown', e => { jumpQueued = true; e.preventDefault(); });
+
+/* =========================================================
+   9) حالة اللعبة والفيزياء
+   ========================================================= */
+const HW = 0.45, H = 2.8, SPEED = 9, JUMP = 13, GRAV = 34;
+const player = { pos: new THREE.Vector3(0, 0, 4), vel: new THREE.Vector3(), onGround: false, ground: null, lastGround: null, coyote: 0, jumpBuf: 0, facing: Math.PI, walk: 0 };
+let checkpoint = new THREE.Vector3(0, 0, 4);
+let state = 'menu', paused = false, gameTime = 0, score = 0, solvedCount = 0, falls = 0, pendingExplain = null, currentStage = -1, activeQ = null;
+
+function overlap(px, py, pz, c) {
+  return px + HW > c.minX && px - HW < c.maxX && pz + HW > c.minZ && pz - HW < c.maxZ && py + H > c.minY && py < c.maxY;
+}
+function physics(dt) {
+  const p = player;
+  // الإدخال
+  let fwd = 0, side = 0;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) fwd += 1;
+  if (keys.has('KeyS') || keys.has('ArrowDown')) fwd -= 1;
+  if (keys.has('KeyD') || keys.has('ArrowRight')) side += 1;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) side -= 1;
+  fwd -= joy.y; side += joy.x;
+  const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  let mx = fx * fwd + rx * side, mz = fz * fwd + rz * side;
+  const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
+  const acc = Math.min(1, dt * (p.onGround ? 14 : 6));
+  p.vel.x += (mx * SPEED - p.vel.x) * acc;
+  p.vel.z += (mz * SPEED - p.vel.z) * acc;
+  if (ml > 0.1) p.facing = Math.atan2(mx, mz);
+
+  // القفز (مع Coyote time ومخزن للقفز)
+  if (jumpQueued) { p.jumpBuf = 0.15; jumpQueued = false; }
+  p.coyote = p.onGround ? 0.12 : p.coyote - dt;
+  if (p.jumpBuf > 0 && p.coyote > 0) { p.vel.y = JUMP; p.coyote = 0; p.jumpBuf = 0; sfx.jump(); }
+  p.jumpBuf -= dt;
+  p.vel.y = Math.max(p.vel.y - GRAV * dt, -45);
+
+  // المحور Y
+  p.pos.y += p.vel.y * dt; p.onGround = false; p.ground = null;
+  for (const c of colliders) {
+    if (c.broken || !overlap(p.pos.x, p.pos.y, p.pos.z, c)) continue;
+    if (p.vel.y <= 0) { p.pos.y = c.maxY; p.vel.y = 0; p.onGround = true; p.ground = c; }
+    else { p.pos.y = c.minY - H; p.vel.y = 0; }
+  }
+  // المحور X ثم Z
+  p.pos.x += p.vel.x * dt;
+  for (const c of colliders) if (!c.broken && overlap(p.pos.x, p.pos.y, p.pos.z, c)) { p.pos.x = p.vel.x > 0 ? c.minX - HW - 1e-3 : c.maxX + HW + 1e-3; p.vel.x = 0; }
+  p.pos.z += p.vel.z * dt;
+  for (const c of colliders) if (!c.broken && overlap(p.pos.x, p.pos.y, p.pos.z, c)) { p.pos.z = p.vel.z > 0 ? c.minZ - HW - 1e-3 : c.maxZ + HW + 1e-3; p.vel.z = 0; }
+
+  if (p.ground && p.ground !== p.lastGround) onLand(p.ground);
+  if (p.onGround && p.ground && p.ground.kind === 'tile' && !p.ground.correct && p.ground.crack < 0) startCrack(p.ground);
+  p.lastGround = p.ground;
+
+  if (p.pos.y < -35) respawn();
+
+  // العملات
+  for (const c of coins) {
+    if (c.taken) continue;
+    const dx = c.mesh.position.x - p.pos.x, dy = c.mesh.position.y - (p.pos.y + 1.3), dz = c.mesh.position.z - p.pos.z;
+    if (dx * dx + dy * dy + dz * dz < 2.2) { c.taken = true; c.mesh.visible = false; addScore(10); sfx.coin(); burst(c.mesh.position, 0xfacc15, 8); }
+  }
+}
+
+function setCheckpoint(c) {
+  if (!c.spawn) return;
+  if (!checkpoint.equals(c.spawn)) { checkpoint.copy(c.spawn); }
+}
+function onLand(c) {
+  if (c.kind === 'intro') {
+    setCheckpoint(c);
+    if (currentStage !== c.stage) { currentStage = c.stage; updateStagePill(); }
+    if (!c.shown) { c.shown = true; sfx.check(); setTimeout(() => showLesson(), 250); }
+  } else if (c.kind === 'qplat') {
+    setCheckpoint(c);
+    if (c.flag && !c.flag.on) { c.flag.on = true; c.flag.flag.material.color.set(c.flag.color); sfx.check(); toast('🚩 نقطة حفظ', '#fff'); }
+    activeQ = c.q; renderQCard();
+  } else if (c.kind === 'tile' && c.correct && !c.q.solved) {
+    solve(c);
+  } else if (c.kind === 'finish' && state === 'play') {
+    win();
+  }
+}
+function startCrack(t) { t.crack = 0.28; sfx.crack(); }
+function breakTile(t) {
+  t.broken = true; t.mesh.visible = false; t.label.visible = false; sfx.brk();
+  const q = t.q; q.wrong++; pendingExplain = { q, value: t.value };
+  // شظايا الزجاج
+  for (let i = 0; i < 4; i++) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 1.8), t.sideMat);
+    m.position.set(t.cx + (i % 2 ? 0.95 : -0.95), -0.25, t.cz + (i < 2 ? 0.95 : -0.95)); scene.add(m);
+    debris.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 2, (Math.random() - 0.5) * 4), r: new THREE.Vector3(Math.random() * 4, Math.random() * 4, Math.random() * 4), life: 2.2 });
+  }
+  burst(new THREE.Vector3(t.cx, 0.3, t.cz), 0x7dd3fc, 18);
+}
+function solve(t) {
+  const q = t.q; q.solved = true; solvedCount++; ui.prog.textContent = solvedCount;
+  t.topMat.color.set(0x86efac); t.sideMat.color.set(0x22c55e); t.sideMat.opacity = 0.9;
+  q.tiles.forEach(o => { if (o !== t && !o.broken) { o.sideMat.color.set(0xfca5a5); o.label.material.opacity = 0.45; } });
+  const pts = Math.max(20, 100 - 40 * q.wrong); addScore(pts);
+  sfx.good(); burst(new THREE.Vector3(t.cx, 1, t.cz), 0x22c55e, 26);
+  toast(q.wrong ? `✔ صحيح! +${pts}` : `🌟 ممتاز من أول محاولة! +${pts}`, '#bbf7d0');
+  activeQ = null; renderQCard();
+}
+function respawn() {
+  falls++; ui.falls.textContent = falls;
+  player.pos.copy(checkpoint); player.vel.set(0, 0, 0); player.facing = Math.PI; camYaw = 0;
+  if (pendingExplain) {
+    const { q, value } = pendingExplain; pendingExplain = null;
+    const st = STAGES[q.stage];
+    showPanel(`<h2>💥 انكسرت البلاطة!</h2>
+      <p class="sub">اخترت <b>${fmt(value)}</b>، لكنها ليست ${TYPE_INFO[q.type].name}.</p>
+      <p><b>القيم:</b></p>${chipsHTML(q.data)}
+      ${explainHTML(q)}
+      <div class="rule">ارجع واقفز على البلاطة <b>${fmt(q.answer)}</b> ✅</div>`, 'أحاول مرة أخرى 💪', st.css);
+  }
+}
+function addScore(n) { score += n; ui.score.textContent = score; }
+function burst(pos, color, n) {
+  const mat = new THREE.MeshBasicMaterial({ color });
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), mat); m.position.copy(pos); scene.add(m);
+    particles.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 9, Math.random() * 8 + 3, (Math.random() - 0.5) * 9), life: 0.9 + Math.random() * 0.4 });
+  }
+}
+function updateStagePill() {
+  const st = STAGES[currentStage];
+  ui.stagePill.textContent = (currentStage + 1) + '/4 • ' + st.name;
+  document.documentElement.style.setProperty('--stage', st.css);
+}
+function renderQCard() {
+  if (!activeQ || activeQ.solved) { ui.qcard.classList.add('hidden'); return; }
+  const q = activeQ, st = STAGES[q.stage];
+  ui.qcard.style.setProperty('--stage', st.css);
+  ui.qcard.innerHTML = `<div class="ctx">${st.name} • السؤال ${q.index + 1} من 3 — ${q.ctx}:</div>
+    ${chipsHTML(q.data)}<div class="q">${TYPE_INFO[q.type].q}</div>
+    <div class="hint">احسب، ثم اقفز على البلاطة الصحيحة 🦘 (H للدرس)</div>`;
+  ui.qcard.classList.remove('hidden');
+}
+function showLesson() {
+  const si = currentStage < 0 ? 0 : currentStage, st = STAGES[si];
+  showPanel(LESSONS[st.key], 'هيا نبدأ! 🚀', st.css);
+}
+function win() {
+  state = 'won'; sfx.win(); ui.qcard.classList.add('hidden');
+  for (let i = 0; i < 6; i++) setTimeout(() => burst(new THREE.Vector3(player.pos.x + (Math.random() - 0.5) * 8, 3, player.pos.z + (Math.random() - 0.5) * 8), [0xfacc15, 0x22c55e, 0x3b82f6, 0xf97316, 0xa855f7, 0xef4444][i], 30), i * 180);
+  const wrongTotal = STAGES.reduce((s, st) => s + st.qs.reduce((a, q) => a + q.wrong, 0), 0);
+  const stars = wrongTotal <= 1 ? 3 : wrongTotal <= 4 ? 2 : 1;
+  const m = Math.floor(gameTime / 60), s = Math.floor(gameTime % 60);
+  setTimeout(() => {
+    showPanel(`<h1>🏆 أحسنت!</h1>
+      <div class="stars">${'⭐'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
+      <p class="sub">أنهيت جزيرة الإحصاء وأصبحت خبيرًا في المتوسط والوسيط والمنوال!</p>
+      <div class="stats">
+        <div>النقاط<b>${score}</b></div>
+        <div>الوقت<b dir="ltr">${m}:${String(s).padStart(2, '0')}</b></div>
+        <div>إجابات صحيحة<b>${solvedCount}/${TOTAL_Q}</b></div>
+        <div>بلاطات مكسورة<b>${wrongTotal}</b></div>
+      </div>
+      <div class="rule">➕ المتوسط = المجموع ÷ العدد<br>↔️ الوسيط = منتصف القيم بعد الترتيب<br>🔁 المنوال = القيمة الأكثر تكرارًا</div>`,
+      'العب مرة أخرى بأسئلة جديدة 🔄', '#eab308', () => location.reload());
+  }, 1400);
+}
+
+/* =========================================================
+   10) الحلقة الرئيسية
+   ========================================================= */
+const clock = new THREE.Clock();
+let menuT = 0;
+function animate(dt, t) {
+  // تشقق البلاطات
+  for (const c of colliders) {
+    if (c.kind !== 'tile' || c.broken) continue;
+    if (c.crack >= 0) {
+      c.crack -= dt;
+      c.mesh.position.x = c.cx + (Math.random() - 0.5) * 0.15; c.sideMat.color.set(0xf87171);
+      if (c.crack <= 0) breakTile(c);
+    }
+  }
+  coins.forEach(c => { if (!c.taken) { c.mesh.rotation.z = t * 3 + c.ph; c.mesh.position.y = c.baseY + Math.sin(t * 2 + c.ph) * 0.15; } });
+  spinners.forEach(s => s.rotation.y = t * 0.8);
+  clouds.forEach(c => { c.g.position.x += c.sp * dt; if (c.g.position.x > 100) c.g.position.x = -100; });
+  flags.forEach((f, i) => { f.flag.rotation.y = Math.sin(t * 3 + i) * 0.25; });
+  for (let i = debris.length - 1; i >= 0; i--) {
+    const d = debris[i]; d.v.y -= GRAV * dt; d.m.position.addScaledVector(d.v, dt);
+    d.m.rotation.x += d.r.x * dt; d.m.rotation.y += d.r.y * dt; d.life -= dt;
+    if (d.life <= 0) { scene.remove(d.m); debris.splice(i, 1); }
+  }
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]; p.v.y -= 20 * dt; p.m.position.addScaledVector(p.v, dt); p.m.rotation.x += dt * 6; p.life -= dt;
+    p.m.scale.setScalar(Math.max(0.01, p.life));
+    if (p.life <= 0) { scene.remove(p.m); particles.splice(i, 1); }
+  }
+  // حركة الشخصية
+  const hs = Math.hypot(player.vel.x, player.vel.z);
+  avatar.position.copy(player.pos);
+  let dr = player.facing - avatar.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr));
+  avatar.rotation.y += dr * Math.min(1, dt * 14);
+  if (player.onGround) {
+    player.walk += hs * dt * 1.1;
+    const a = Math.sin(player.walk) * Math.min(1, hs / SPEED) * 0.9;
+    legL.rotation.x = a; legR.rotation.x = -a; armL.rotation.x = -a; armR.rotation.x = a;
+    armL.rotation.z = armR.rotation.z = 0;
+  } else {
+    legL.rotation.x = 0.4; legR.rotation.x = -0.3; armL.rotation.x = armR.rotation.x = Math.PI * 0.9;
+    armL.rotation.z = 0.15; armR.rotation.z = -0.15;
+  }
+}
+const ray = new THREE.Raycaster();
+function updateCamera(dt) {
+  const tgt = new THREE.Vector3(player.pos.x, player.pos.y + 2, player.pos.z);
+  if (state === 'menu') { menuT += dt; camYaw = Math.sin(menuT * 0.25) * 0.9; }
+  const cp = Math.cos(camPitch);
+  camera.position.set(tgt.x + Math.sin(camYaw) * camDist * cp, tgt.y + Math.sin(camPitch) * camDist, tgt.z + Math.cos(camYaw) * camDist * cp);
+  camera.lookAt(tgt);
+  // اللوحة التي تغطي على الشخصية تصير شفافة
+  ray.set(camera.position, tgt.clone().sub(camera.position).normalize());
+  ray.far = camera.position.distanceTo(tgt);
+  boards.forEach(b => {
+    const hit = ray.intersectObject(b.grp, true).length > 0;
+    b.fade += ((hit ? 0.18 : 1) - b.fade) * Math.min(1, dt * 10);
+    b.mats.forEach(m => { m.opacity = b.fade; m.depthWrite = b.fade > 0.95; });
+  });
+  sun.position.set(player.pos.x + 18, player.pos.y + 40, player.pos.z + 14);
+  sun.target.position.copy(player.pos);
+}
+let lastSec = -1;
+function loop() {
+  requestAnimationFrame(loop);
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  if (state === 'play' && !paused) {
+    gameTime += dt; physics(dt);
+    const sec = Math.floor(gameTime);
+    if (sec !== lastSec) { lastSec = sec; ui.time.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
+  }
+  if (state === 'won') { player.vel.set(0, 0, 0); }
+  animate(dt, t); updateCamera(dt);
+  renderer.render(scene, camera);
+}
+
+/* =========================================================
+   11) البدء
+   ========================================================= */
+Promise.race([
+  Promise.all([document.fonts.load(`900 40px Cairo`), document.fonts.load(`700 40px Cairo`), document.fonts.load(`40px Lalezar`)]),
+  new Promise(r => setTimeout(r, 3000))
+]).then(() => {
+  buildWorld();
+  $('loading').remove();
+  $('startScreen').classList.remove('hidden');
+  loop();
+});
+$('startBtn').onclick = () => {
+  try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  $('startScreen').classList.add('hidden');
+  $('hud').classList.remove('hidden');
+  if (isTouch) $('touch').classList.remove('hidden');
+  state = 'play'; camYaw = 0; camPitch = 0.42; canvas.focus();
+  toast('انطلق! ⬆️', '#fff');
+};
+$('lessonBtn').onclick = () => showLesson();
+
+// للاختبار
+window.__game = { player, STAGES: () => STAGES, colliders: () => colliders, get state() { return state; } };
+})();
+</script>
+</body>
+</html>

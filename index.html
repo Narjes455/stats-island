@@ -720,7 +720,7 @@ $('jumpBtn').addEventListener('pointerdown', e => { jumpQueued = true; e.prevent
 const HW = 0.45, H = 2.8, SPEED = 9, JUMP = 13, GRAV = 34;
 const player = { pos: new THREE.Vector3(0, 0, 4), vel: new THREE.Vector3(), onGround: false, ground: null, lastGround: null, coyote: 0, jumpBuf: 0, facing: Math.PI, walk: 0 };
 let checkpoint = new THREE.Vector3(0, 0, 4);
-let state = 'menu', paused = false, gameTime = 0, score = 0, solvedCount = 0, falls = 0, pendingExplain = null, breaks = 0, currentStage = -1, activeQ = null;
+let state = 'menu', paused = false, gameTime = 0, score = 0, solvedCount = 0, falls = 0, pendingExplain = null, failing = false, breaks = 0, currentStage = -1, activeQ = null;
 
 function overlap(px, py, pz, c) {
   return px + HW > c.minX && px - HW < c.maxX && pz + HW > c.minZ && pz - HW < c.maxZ && py + H > c.minY && py < c.maxY;
@@ -736,6 +736,7 @@ function physics(dt) {
   fwd -= joy.y; side += joy.x;
   const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
   let mx = fx * fwd + rx * side, mz = fz * fwd + rz * side;
+  if (failing) { mx = mz = 0; p.vel.x = p.vel.z = 0; jumpQueued = false; p.jumpBuf = 0; }
   const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
   const acc = Math.min(1, dt * (p.onGround ? 14 : 6));
   p.vel.x += (mx * SPEED - p.vel.x) * acc;
@@ -780,7 +781,25 @@ function setCheckpoint(c) {
   if (!c.spawn) return;
   if (!checkpoint.equals(c.spawn)) { checkpoint.copy(c.spawn); }
 }
+function guardSkip(c) {
+  let before;
+  if (c.kind === 'qplat') before = slots.slice(0, slots.indexOf(c.slot));
+  else if (c.kind === 'intro') before = slots.filter(sl => sl.stage < c.stage);
+  else if (c.kind === 'finish') before = slots;
+  else return false;
+  const miss = before.find(sl => !sl.q.solved);
+  if (!miss) return false;
+  const st = STAGES[miss.stage];
+  restartStage(miss.stage);
+  player.pos.copy(checkpoint); player.vel.set(0, 0, 0); player.facing = Math.PI; camYaw = 0; player.lastGround = null;
+  sfx.brk();
+  showPanel(`<h2>✋ لا تتخطى الأسئلة!</h2>
+    <p class="sub">لازم تقفز على البلاطة الصحيحة في كل جسر.</p>
+    <div class="rule">🔄 رجعت لبداية مرحلة <b>${st.name}</b>، وتنتظرك أسئلة جديدة!</div>`, 'أبدأ المرحلة من جديد 💪', st.css);
+  return true;
+}
 function onLand(c) {
+  if (guardSkip(c)) return;
   if (c.kind === 'intro') {
     setCheckpoint(c);
     if (currentStage !== c.stage) { currentStage = c.stage; updateStagePill(); }
@@ -795,10 +814,13 @@ function onLand(c) {
     win();
   }
 }
-function startCrack(t) { t.crack = 0.28; sfx.crack(); }
+function startCrack(t) {
+  t.crack = 0.28; sfx.crack();
+  if (!failing) { failing = true; t.q.wrong++; breaks++; pendingExplain = { q: t.q, value: t.value }; }
+}
 function breakTile(t) {
   t.broken = true; t.mesh.visible = false; t.label.visible = false; sfx.brk();
-  const q = t.q; q.wrong++; breaks++; pendingExplain = { q, value: t.value };
+  
   // شظايا الزجاج
   for (let i = 0; i < 4; i++) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 1.8), t.sideMat);
@@ -817,7 +839,7 @@ function solve(t) {
   activeQ = null; renderQCard();
 }
 function respawn() {
-  falls++; ui.falls.textContent = falls;
+  falls++; ui.falls.textContent = falls; failing = false;
   const pe = pendingExplain;
   if (pe) restartStage(pe.q.stage);
   player.pos.copy(checkpoint); player.vel.set(0, 0, 0); player.facing = Math.PI; camYaw = 0;
